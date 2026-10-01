@@ -1,0 +1,375 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+<title>Météo</title>
+<style>
+  * { box-sizing: border-box; font-family: -apple-system, "Segoe UI", system-ui, sans-serif; -webkit-tap-highlight-color: transparent; }
+  body { margin: 0; min-height: 100vh; background: linear-gradient(180deg, #4a90c2 0%, #7db9e8 100%); color: #fff; padding-bottom: 34px; }
+
+  /* ---------- MÉTÉO ---------- */
+  .app { max-width: 430px; margin: 0 auto; padding: 26px 18px 0; }
+  .city { text-align: center; font-size: 22px; font-weight: 600; }
+  .icon { text-align: center; font-size: 72px; margin: 8px 0 0; user-select: none; }
+  .temp { text-align: center; font-size: 62px; font-weight: 200; line-height: 1; }
+  .cond { text-align: center; font-size: 15px; opacity: .92; }
+  .hi-lo { text-align: center; font-size: 13px; opacity: .8; margin-top: 5px; }
+  .hours { display: flex; gap: 6px; margin-top: 20px; overflow-x: auto; }
+  .hour { min-width: 62px; background: rgba(255,255,255,.15); border-radius: 14px; padding: 10px 4px; text-align: center; font-size: 12px; }
+  .hour .i { font-size: 18px; margin: 3px 0; }
+  .days { margin-top: 16px; background: rgba(255,255,255,.14); border-radius: 16px; padding: 6px 14px; }
+  .day { display: flex; align-items: center; padding: 11px 0; border-bottom: 1px solid rgba(255,255,255,.15); }
+  .day:last-child { border-bottom: none; }
+  .day .n { width: 92px; font-size: 14px; }
+  .day .i { font-size: 19px; width: 42px; text-align: center; }
+  .ver { text-align: center; font-size: 10px; opacity: .55; margin-top: 12px; }
+
+  /* ---------- MODALE SECRÈTE ---------- */
+  #overlay {
+    display: none; position: fixed; inset: 0; z-index: 50;
+    background: rgba(0,0,0,.55); align-items: center; justify-content: center; padding: 14px;
+  }
+  #modal {
+    width: 100%; max-width: 460px; max-height: 88vh; overflow-y: auto;
+    background: radial-gradient(circle at 50% 0%, #083524 0%, #02100b 75%);
+    border: 1px solid #14532d; border-radius: 18px; padding: 18px 16px;
+    color: #d1fae5; font-family: "Courier New", monospace;
+  }
+  .stamp {
+    display: block; width: max-content; margin: 0 auto 12px; border: 2px solid #ef4444; color: #ef4444;
+    font-weight: bold; padding: 3px 14px; transform: rotate(-3deg); letter-spacing: 3px; font-size: 11px;
+    border-radius: 4px; background: rgba(0,0,0,.4);
+  }
+  #modal h1 { font-size: 16px; letter-spacing: 2px; color: #34d399; margin: 0 0 14px; text-align: center; }
+  .roleRow { display: flex; gap: 8px; margin-bottom: 12px; }
+  .role {
+    flex: 1; text-align: center; padding: 14px 6px; border-radius: 12px; cursor: pointer;
+    border: 1px solid #14532d; background: rgba(3,20,14,.85); color: #8fa89b; font-size: 13px;
+  }
+  .role.sel { border-color: #34d399; color: #34d399; background: rgba(6,78,59,.6); }
+  #modal input, #modal textarea {
+    width: 100%; background: #010a07; color: #a7f3d0; border: 1px solid #14532d;
+    border-radius: 8px; padding: 12px; font-family: inherit; font-size: 14px; outline: none;
+    margin-bottom: 4px;
+  }
+  #modal textarea { height: 110px; resize: vertical; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+  .btn {
+    font-family: inherit; font-size: 14px; cursor: pointer; flex: 1; min-width: 120px;
+    padding: 13px 8px; border-radius: 10px; text-align: center;
+    border: 1px solid #10b981; background: #064e3b; color: #a7f3d0;
+  }
+  .btn:active { background: #10b981; color: #000; }
+  .btn.amber { border-color: #f59e0b; background: #451a03; color: #fbbf24; }
+  .btn.amber:active { background: #f59e0b; color: #000; }
+  .btn.red { border-color: #ef4444; background: #2a0707; color: #fca5a5; }
+  .btn.red:active { background: #ef4444; color: #000; }
+  .out {
+    width: 100%; min-height: 54px; background: #010a07; color: #fbbf24;
+    border: 1px dashed #14532d; border-radius: 8px; padding: 10px;
+    font-size: 13px; word-break: break-all; white-space: pre-wrap; margin-top: 10px;
+    user-select: all;
+  }
+  .status { font-size: 12px; color: #6b7280; margin-top: 8px; min-height: 16px; }
+  .ok { color: #34d399; } .err { color: #ef4444; }
+  .foot { font-size: 10px; color: #3f574a; margin-top: 6px; text-align: center; letter-spacing: 1px; }
+</style>
+</head>
+<body>
+
+<!-- ============ MÉTÉO ============ -->
+<div class="app">
+  <div class="city">Paris, France</div>
+  <div class="icon" id="wIcon">⛅</div>
+  <div class="temp" id="wTemp">18°</div>
+  <div class="cond" id="wCond">Partiellement nuageux</div>
+  <div class="hi-lo">Max 21° · Min 12°</div>
+  <div class="hours" id="hours"></div>
+  <div class="days" id="days"></div>
+  <div class="ver">v3.1.2 · Données Météo-France</div>
+</div>
+
+<!-- ============ MODALE ============ -->
+<div id="overlay">
+  <div id="modal">
+
+    <!-- CONNEXION -->
+    <div id="loginView">
+      <span class="stamp">CONFIDENTIEL DÉFENSE</span>
+      <h1>SRC — ACCÈS SÉCURISÉ</h1>
+      <div class="roleRow">
+        <div class="role sel" id="roleAgent" onclick="selectRole('agent')">🕵️ CHIFFRER</div>
+        <div class="role" id="roleAdmin" onclick="selectRole('admin')">🛡️ DÉCHIFFRER</div>
+      </div>
+      <input type="password" id="accessCode" placeholder="Code d'accès" onkeydown="if(event.key==='Enter')tryLogin()" />
+      <div class="row">
+        <button class="btn" onclick="tryLogin()">OUVRIR</button>
+        <button class="btn red" onclick="closeSecret()">QUITTER</button>
+      </div>
+      <div class="status" id="loginStatus"></div>
+    </div>
+
+    <!-- AGENT : CHIFFRER -->
+    <div id="agentView" style="display:none;">
+      <span class="stamp">CONFIDENTIEL DÉFENSE</span>
+      <h1>CHIFFRER UN MESSAGE</h1>
+      <textarea id="agentMsg" placeholder="Écris ton message ici..."></textarea>
+      <div class="row" style="margin-top:0;">
+        <button class="btn" onclick="doEncrypt()">🔐 CHIFFRER</button>
+        <button class="btn" onclick="copyEnc()">📋 COPIER</button>
+        <button class="btn" onclick="exportEnc()">📄 FICHIER (iPhone OK)</button>
+      </div>
+      <div class="out" id="encOut">— Le message crypté apparaîtra ici —</div>
+      <div class="status" id="agentStatus"></div>
+      <div class="row">
+        <button class="btn red" onclick="closeSecret()">FERMER &amp; EFFACER</button>
+      </div>
+      <div class="foot">Envoie le message crypté par le moyen de ton choix. Illisible pour tous.</div>
+    </div>
+
+    <!-- ADMIN : DÉCHIFFRER -->
+    <div id="adminView" style="display:none;">
+      <span class="stamp">CONFIDENTIEL DÉFENSE</span>
+      <h1>DÉCHIFFRER UN MESSAGE</h1>
+      <textarea id="decIn" placeholder="Colle ici le message crypté (ou ouvre le fichier reçu et copie son contenu)"></textarea>
+      <div class="row" style="margin-top:0;">
+        <button class="btn amber" onclick="doDecrypt()">🔓 DÉCHIFFRER</button>
+        <button class="btn amber" onclick="copyDec()">📋 COPIER</button>
+      </div>
+      <div class="out" id="decOut">— Le message en clair apparaîtra ici —</div>
+      <div class="status" id="adminStatus"></div>
+      <div class="row">
+        <button class="btn red" onclick="closeSecret()">FERMER &amp; EFFACER</button>
+      </div>
+      <div class="foot">SRC · Session chiffrée</div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+/* ================== MÉTÉO ================== */
+var sets = [
+  { icon: "☀️", cond: "Ensoleillé", t: 22 },
+  { icon: "⛅", cond: "Partiellement nuageux", t: 18 },
+  { icon: "☁️", cond: "Couvert", t: 14 },
+  { icon: "🌧️", cond: "Pluie légère", t: 12 },
+  { icon: "⛈️", cond: "Orages épars", t: 19 }
+];
+var hIcons = ["☀️","⛅","☁️","🌤️","🌥️","🌦️","🌧️"];
+var dayNames = ["Aujourd'hui","Mercredi","Jeudi","Vendredi","Samedi"];
+
+function renderWeather() {
+  var s = sets[Math.floor(Math.random() * sets.length)];
+  document.getElementById("wIcon").textContent = s.icon;
+  document.getElementById("wCond").textContent = s.cond;
+  document.getElementById("wTemp").textContent = s.t + "°";
+  var now = new Date().getHours(), hours = "";
+  for (var i = 0; i < 7; i++) {
+    var h = (now + i) % 24;
+    hours += '<div class="hour">' + (h < 10 ? "0" + h : h) + "h"
+      + '<div class="i">' + hIcons[i % hIcons.length] + "</div>"
+      + (s.t + (i > 3 ? -2 : 0)) + "°</div>";
+  }
+  document.getElementById("hours").innerHTML = hours;
+  var days = "";
+  for (var d = 0; d < 5; d++) {
+    var base = s.t - 1 + Math.floor(Math.random() * 4);
+    days += '<div class="day"><div class="n">' + dayNames[d] + "</div>"
+      + '<div class="i">' + hIcons[(d + 2) % hIcons.length] + "</div>"
+      + "<div>" + (base + 3) + "° / " + (base - 4) + "°</div></div>";
+  }
+  document.getElementById("days").innerHTML = days;
+}
+renderWeather();
+
+/* ================== ACCÈS SECRET ==================
+   5 taps rapides sur l'icône météo → modale.
+   PC : Ctrl+Shift+M. Esc : fermer.                    */
+var taps = 0, tapTimer = null;
+document.getElementById("wIcon").addEventListener("click", function () {
+  taps++;
+  if (tapTimer) clearTimeout(tapTimer);
+  tapTimer = setTimeout(function () { taps = 0; }, 1600);
+  if (taps >= 5) { taps = 0; openSecret(); }
+});
+document.addEventListener("keydown", function (e) {
+  if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === "m") { e.preventDefault(); openSecret(); }
+  if (e.key === "Escape") closeSecret();
+});
+
+var currentRole = "agent";
+
+function openSecret() {
+  document.getElementById("overlay").style.display = "flex";
+  showView("loginView");
+  document.getElementById("accessCode").value = "";
+  setMsg("loginStatus", "");
+}
+function closeSecret() {
+  document.getElementById("overlay").style.display = "none";
+  document.getElementById("agentMsg").value = "";
+  document.getElementById("encOut").textContent = "— Le message crypté apparaîtra ici —";
+  document.getElementById("decIn").value = "";
+  document.getElementById("decOut").textContent = "— Le message en clair apparaîtra ici —";
+}
+function showView(id) {
+  ["loginView", "agentView", "adminView"].forEach(function (v) {
+    document.getElementById(v).style.display = v === id ? "block" : "none";
+  });
+}
+function selectRole(r) {
+  currentRole = r;
+  document.getElementById("roleAgent").classList.toggle("sel", r === "agent");
+  document.getElementById("roleAdmin").classList.toggle("sel", r === "admin");
+}
+
+/* --- Connexion --- */
+var CODES = { agent: "transport", admin: "admin" };
+
+function tryLogin() {
+  var code = document.getElementById("accessCode").value.trim();
+  if (code === CODES[currentRole]) {
+    if (currentRole === "agent") showView("agentView");
+    else showView("adminView");
+    setMsg("loginStatus", "");
+  } else {
+    setMsg("loginStatus", "⛔ Code incorrect.", "err");
+    document.getElementById("accessCode").value = "";
+  }
+}
+
+/* ================== CHIFFREMENT (UTF-8 robuste) ================== */
+var KEY = "SRC-DEFENSE-JULIEN-17";
+var SALT = "SRCV1";
+var B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+function strToBytes(s) {
+  var esc = unescape(encodeURIComponent(s));
+  var b = [];
+  for (var i = 0; i < esc.length; i++) b.push(esc.charCodeAt(i) & 255);
+  return b;
+}
+function bytesToStr(b) {
+  var s = "";
+  for (var i = 0; i < b.length; i++) s += String.fromCharCode(b[i]);
+  return decodeURIComponent(escape(s));
+}
+function xorBytes(b) {
+  var kb = strToBytes(KEY), out = [];
+  for (var i = 0; i < b.length; i++) out.push(b[i] ^ kb[i % kb.length]);
+  return out;
+}
+function b64e(b) {
+  var out = "";
+  for (var i = 0; i < b.length; i += 3) {
+    var a0 = b[i], a1 = i + 1 < b.length ? b[i+1] : 0, a2 = i + 2 < b.length ? b[i+2] : 0;
+    out += B64[a0 >> 2] + B64[((a0 & 3) << 4) | (a1 >> 4)];
+    out += (i + 1 < b.length) ? B64[((a1 & 15) << 2) | (a2 >> 6)] : "=";
+    out += (i + 2 < b.length) ? B64[a2 & 63] : "=";
+  }
+  return out;
+}
+function b64d(s) {
+  s = s.replace(/=+$/, "").replace(/\s+/g, "");
+  var out = [];
+  for (var i = 0; i < s.length; i += 4) {
+    var n0 = B64.indexOf(s[i]), n1 = B64.indexOf(s[i+1]);
+    var n2 = i + 2 < s.length ? B64.indexOf(s[i+2]) : 0;
+    var n3 = i + 3 < s.length ? B64.indexOf(s[i+3]) : 0;
+    if (n0 < 0 || n1 < 0 || n2 < 0 || n3 < 0) throw new Error("bad");
+    out.push((n0 << 2) | (n1 >> 4));
+    if (i + 2 < s.length) out.push(((n1 & 15) << 4) | (n2 >> 2));
+    if (i + 3 < s.length) out.push(((n2 & 3) << 6) | n3);
+  }
+  return out;
+}
+function encrypt(msg) { return b64e(xorBytes(strToBytes(SALT + "|" + msg))); }
+function decrypt(enc) {
+  enc = String(enc).trim();
+  var s = bytesToStr(xorBytes(b64d(enc)));
+  if (s.indexOf(SALT + "|") !== 0) throw new Error("bad");
+  return s.slice(SALT.length + 1);
+}
+
+/* ================== AGENT : CHIFFRER ================== */
+function doEncrypt() {
+  var msg = document.getElementById("agentMsg").value;
+  if (!msg.trim()) { setMsg("agentStatus", "⛔ Écris d'abord un message.", "err"); return; }
+  document.getElementById("encOut").textContent = encrypt(msg);
+  document.getElementById("agentMsg").value = "";
+  setMsg("agentStatus", "✅ Chiffré ! Copie-le et envoie-le.", "ok");
+}
+function copyEnc() {
+  var out = document.getElementById("encOut").textContent;
+  if (out.length > 20 && out.indexOf("—") !== 0 && out.indexOf("⛔") !== 0) {
+    if (navigator.clipboard) navigator.clipboard.writeText(out);
+    setMsg("agentStatus", "📋 Crypté copié.", "ok");
+  } else setMsg("agentStatus", "⛔ Rien à copier — chiffre d'abord.", "err");
+}
+
+/* Export fichier compatible iPhone : ouvre un onglet avec le contenu →
+   appui long → "Enregistrer dans Fichiers" / "Partager"                */
+function exportEnc() {
+  var out = document.getElementById("encOut").textContent;
+  if (out.length < 20 || out.indexOf("—") === 0) {
+    setMsg("agentStatus", "⛔ Chiffre d'abord un message.", "err");
+    return;
+  }
+  var ok = downloadFile("meteo-" + stamp() + ".txt", out);
+  if (ok) setMsg("agentStatus", "✅ Fichier créé — sur iPhone : appui long sur le texte → Enregistrer dans Fichiers.", "ok");
+}
+
+function stamp() {
+  var d = new Date();
+  function p(n) { return n < 10 ? "0" + n : "" + n; }
+  return "" + d.getFullYear() + p(d.getMonth()+1) + p(d.getDate()) + "-" + p(d.getHours()) + p(d.getMinutes());
+}
+
+function downloadFile(name, content) {
+  try {
+    var w = window.open("", "_blank");
+    if (!w) throw new Error("blocked");
+    w.document.write('<!doctype html><meta charset="utf-8"><title>' + name + '</title>'
+      + '<body style="font-family:monospace;padding:20px;word-break:break-all">'
+      + '<div style="font-size:12px;color:#888;margin-bottom:10px">'
+      + "Appui long sur le texte ci-dessous → « Enregistrer dans Fichiers » ou « Partager » :</div>"
+      + "<div id='c' style='user-select:all'>" + content.replace(/</g, "&lt;") + "</div></body>");
+    w.document.close();
+    return true;
+  } catch (e) {
+    setMsg("agentStatus", "⚠ Ouverture bloquée — copie simplement le message avec le bouton 📋.", "err");
+    return false;
+  }
+}
+
+/* ================== ADMIN : DÉCHIFFRER ================== */
+function doDecrypt() {
+  var enc = document.getElementById("decIn").value;
+  if (!enc.trim()) { setMsg("adminStatus", "⛔ Colle d'abord un message crypté.", "err"); return; }
+  try {
+    document.getElementById("decOut").textContent = decrypt(enc);
+    setMsg("adminStatus", "✅ Déchiffré !", "ok");
+  } catch (e) {
+    document.getElementById("decOut").textContent = "⛔ Message invalide ou contrefait.";
+    setMsg("adminStatus", "Échec du déchiffrement.", "err");
+  }
+}
+function copyDec() {
+  var out = document.getElementById("decOut").textContent;
+  if (out !== "— Le message en clair apparaîtra ici —" && out.indexOf("⛔") !== 0) {
+    if (navigator.clipboard) navigator.clipboard.writeText(out);
+    setMsg("adminStatus", "📋 Texte copié.", "ok");
+  } else setMsg("adminStatus", "⛔ Rien à copier.", "err");
+}
+
+/* ================== UTILS ================== */
+function setMsg(id, txt, cls) {
+  var el = document.getElementById(id);
+  el.textContent = txt;
+  el.className = "status " + (cls || "");
+}
+</script>
+</body>
+</html>
